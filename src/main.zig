@@ -28,20 +28,54 @@ const CPUSample = struct {
     // guest_nice: u64,
 };
 
-const Infos = struct {
-    serverVersion: str,
-    serverId: str,
-    serverUptime: i64,
-    serverHostname: str,
-    cpuUsage: u7,
-    cpuArch: str,
-    cpuName: str,
-    ramPercent: u7,
-    osType: str,
-    osPlatform: str,
-    osVersion: str,
-    osRelease: str,
+const CPUInfo = struct {
+    usage: u7, // percentage, cannot exceed 100
+    arch: str,
+    model: str,
 };
+
+const OSInfo = struct {
+    type: str,
+    platform: str,
+    version: str,
+    release: str,
+};
+
+const softwareInfo = struct { version: str = SERVER_VERSION };
+
+const RAMInfo = struct {
+    percent: u7, // shouldn't exceed 100, the smallest integer that can fit 100 is a u7
+    free: u32, // supports up to 4TB of ram
+    max: u32,
+};
+
+// const Infos = struct {
+//     serverVersion: str,
+//     serverId: str,
+//     serverUptime: i64,
+//     serverHostname: str,
+//     cpuUsage: u7,
+//     cpuArch: str,
+//     cpuName: str,
+//     ramPercent: u7,
+//     ramFree: u32, // support up to 4TB of RAM
+//     ramMax: u32,
+//     osType: str,
+//     osPlatform: str,
+//     osVersion: str,
+//     osRelease: str,
+// };
+
+const ServerInfo = struct {
+    id: str,
+    uptime: i64,
+    hostname: str,
+    cpu: ?CPUInfo,
+    ram: ?RAMInfo,
+    os: ?OSInfo,
+};
+
+const Infos = struct { software: softwareInfo, server: ServerInfo };
 
 fn parse_proc_info(comptime path: str, key: str, buf: []u8, max_it: ?u8) ?[]const u8 {
     var i: u8 = 0;
@@ -139,7 +173,7 @@ fn get_load_avg() str {
     return "TODO";
 }
 
-fn calc_ram_usage() ?u7 {
+fn getRAMStats() ?RAMInfo {
     var buff: [50]u8 = undefined;
     var buf2: [50]u8 = undefined;
     const mem_total_str = parse_proc_info("/proc/meminfo", "MemTotal", &buff, null);
@@ -151,7 +185,11 @@ fn calc_ram_usage() ?u7 {
     const mem_available = std.fmt.parseUnsigned(u26, mem_available_str.?[0 .. mem_available_str.?.len - 3], 10) catch return null;
     const percent: u7 = @intFromFloat(@floor((@as(f32, @floatFromInt(mem_available)) / @as(f32, @floatFromInt(mem_total)) * 100)));
 
-    return percent;
+    return .{
+        .percent = percent,
+        .free = mem_available,
+        .max = mem_total,
+    };
 }
 
 fn get_uptime() i64 {
@@ -169,19 +207,40 @@ fn process_request(request: zap.SimpleRequest) void {
     var cpuInfoBuff: [256]u8 = undefined;
     var uname = os.uname();
 
+    // const systemInfo = Infos{
+    //     .serverVersion = SERVER_VERSION,
+    //     .serverId = os.getenv("SERVER_NAME") orelse "Unnamed server",
+    //     .serverUptime = get_uptime(),
+    //     .serverHostname = trim_zeros_right(&uname.nodename),
+    //     .cpuUsage = get_cpu_percent(null) orelse 0,
+    //     .cpuArch = trim_zeros_right(&uname.machine),
+    //     .cpuName = parse_proc_info("/proc/cpuinfo", "model name", &cpuInfoBuff, null) orelse "Unable to query CPU Name",
+    //     .ramPercent = calc_ram_usage() orelse 0,
+    //     .osType = trim_zeros_right(&uname.sysname),
+    //     .osPlatform = trim_zeros_right(&uname.sysname), // basically the same as the OS type
+    //     .osVersion = trim_zeros_right(&uname.version),
+    //     .osRelease = trim_zeros_right(&uname.release),
+    // };
+
     const systemInfo = Infos{
-        .serverVersion = SERVER_VERSION,
-        .serverId = os.getenv("SERVER_NAME") orelse "Unnamed server",
-        .serverUptime = get_uptime(),
-        .serverHostname = trim_zeros_right(&uname.nodename),
-        .cpuUsage = get_cpu_percent(null) orelse 0,
-        .cpuArch = trim_zeros_right(&uname.machine),
-        .cpuName = parse_proc_info("/proc/cpuinfo", "model name", &cpuInfoBuff, null) orelse "Unable to query CPU Name",
-        .ramPercent = calc_ram_usage() orelse 0,
-        .osType = trim_zeros_right(&uname.sysname),
-        .osPlatform = trim_zeros_right(&uname.sysname), // basically the same as the OS type
-        .osVersion = trim_zeros_right(&uname.version),
-        .osRelease = trim_zeros_right(&uname.release),
+        .software = softwareInfo{},
+        .server = ServerInfo{
+            .id = os.getenv("SERVER_NAME") orelse "Unnamed server",
+            .uptime = get_uptime(),
+            .hostname = trim_zeros_right(&uname.nodename),
+            .cpu = CPUInfo{
+                .usage = get_cpu_percent(null) orelse 0,
+                .arch = trim_zeros_right(&uname.machine),
+                .model = parse_proc_info("/proc/cpuinfo", "model name", &cpuInfoBuff, null) orelse "Unable to query CPU Name",
+            },
+            .ram = getRAMStats(),
+            .os = OSInfo{
+                .type = trim_zeros_right(&uname.sysname),
+                .platform = trim_zeros_right(&uname.sysname), // basically the same as the OS type
+                .version = trim_zeros_right(&uname.version),
+                .release = trim_zeros_right(&uname.release),
+            },
+        },
     };
 
     requestBody = std.json.stringifyAlloc(alloc, systemInfo, .{}) catch "{\"Error\":\"Unable to generate JSON\"}";
