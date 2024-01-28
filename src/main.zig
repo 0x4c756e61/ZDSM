@@ -203,24 +203,15 @@ fn trim_zeros_right(value: *[64:0]u8) []u8 {
 }
 
 fn process_request(request: zap.SimpleRequest) void {
+    if (!(request.method == null) and !std.mem.eql(u8, request.method.?, "GET") or (!(request.path == null) and !std.mem.eql(u8, request.path.?, "/api"))) {
+        request.setStatus(.not_found);
+        request.sendJson("{\"Error\":\"BAD REQUEST\"}") catch return;
+        return;
+    }
+
     var requestBody: []const u8 = undefined;
     var cpuInfoBuff: [256]u8 = undefined;
     var uname = os.uname();
-
-    // const systemInfo = Infos{
-    //     .serverVersion = SERVER_VERSION,
-    //     .serverId = os.getenv("SERVER_NAME") orelse "Unnamed server",
-    //     .serverUptime = get_uptime(),
-    //     .serverHostname = trim_zeros_right(&uname.nodename),
-    //     .cpuUsage = get_cpu_percent(null) orelse 0,
-    //     .cpuArch = trim_zeros_right(&uname.machine),
-    //     .cpuName = parse_proc_info("/proc/cpuinfo", "model name", &cpuInfoBuff, null) orelse "Unable to query CPU Name",
-    //     .ramPercent = calc_ram_usage() orelse 0,
-    //     .osType = trim_zeros_right(&uname.sysname),
-    //     .osPlatform = trim_zeros_right(&uname.sysname), // basically the same as the OS type
-    //     .osVersion = trim_zeros_right(&uname.version),
-    //     .osRelease = trim_zeros_right(&uname.release),
-    // };
 
     const systemInfo = Infos{
         .software = softwareInfo{},
