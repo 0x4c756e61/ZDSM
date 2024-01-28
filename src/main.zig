@@ -7,6 +7,7 @@ const system = os.system;
 const print = std.debug.print;
 
 const str = []const u8;
+const DEFAULT_PORT = 3040;
 
 var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 var alloc = gpa.allocator();
@@ -190,16 +191,20 @@ fn process_request(request: zap.SimpleRequest) void {
 }
 
 pub fn main() !void {
+    const port = p: {
+        const env = os.getenv("PORT");
+        if (env == null) break :p DEFAULT_PORT;
+        break :p std.fmt.parseUnsigned(usize, env.?, 10) catch DEFAULT_PORT;
+    };
+
     var server = zap.SimpleHttpListener.init(.{
-        .port = 3000,
+        .port = port,
         .on_request = process_request,
         .log = false,
     });
 
     try server.listen();
-    std.debug.print("Started\n", .{});
-
-    _ = get_cpu_percent(null) orelse 0;
+    std.debug.print("Started on port {any}\n", .{@as(u16, @truncate(port))});
 
     zap.start(.{
         .threads = 1,
