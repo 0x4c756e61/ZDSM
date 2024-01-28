@@ -41,9 +41,9 @@ const OSInfo = struct {
     release: str,
 };
 
-const softwareInfo = struct { version: str = SERVER_VERSION };
+const SoftwareInfo = struct { version: str = SERVER_VERSION };
 
-const RAMInfo = struct {
+const RAMStat = struct {
     percent: u7, // shouldn't exceed 100, the smallest integer that can fit 100 is a u7
     free: u32, // supports up to 4TB of ram
     max: u32,
@@ -71,13 +71,13 @@ const ServerInfo = struct {
     uptime: i64,
     hostname: str,
     cpu: ?CPUInfo,
-    ram: ?RAMInfo,
+    ram: ?RAMStat,
     os: ?OSInfo,
 };
 
-const Infos = struct { software: softwareInfo, server: ServerInfo };
+const Infos = struct { software: SoftwareInfo, server: ServerInfo };
 
-fn parse_proc_info(comptime path: str, key: str, buf: []u8, max_it: ?u8) ?[]const u8 {
+fn parseProcInfo(comptime path: str, key: str, buf: []u8, max_it: ?u8) ?[]const u8 {
     var i: u8 = 0;
     var fbs = std.io.fixedBufferStream(buf);
     var fileDescriptor = fs.openFileAbsolute(path, .{ .intended_io_mode = .blocking }) catch |err| switch (err) {
@@ -102,7 +102,7 @@ fn parse_proc_info(comptime path: str, key: str, buf: []u8, max_it: ?u8) ?[]cons
     return null;
 }
 
-fn parse_cpustat_fields(field_line: []u8) CPUSample {
+fn parseCPUStatFields(field_line: []u8) CPUSample {
     var it = std.mem.splitScalar(u8, field_line, ' ');
     var result: CPUSample = undefined;
     // TODO: Optimise using metaprogramming
@@ -120,29 +120,29 @@ fn parse_cpustat_fields(field_line: []u8) CPUSample {
     return result;
 }
 
-fn get_cpu_sample() ?CPUSample {
+fn getCPUSample() ?CPUSample {
     // SEE: https://stackoverflow.com/questions/11356330/how-to-get-cpu-usage
     // SEE: https://www.baeldung.com/linux/get-cpu-usage
     var buf: [200]u8 = undefined;
 
-    var fileDescriptor = fs.openFileAbsolute("/proc/stat", .{ .intended_io_mode = .blocking }) catch return null;
+    var file_descriptor = fs.openFileAbsolute("/proc/stat", .{ .intended_io_mode = .blocking }) catch return null;
 
-    defer fileDescriptor.close();
-    const file = fileDescriptor.reader();
+    defer file_descriptor.close();
+    const file = file_descriptor.reader();
     const line = (file.readUntilDelimiter(&buf, '\n') catch return null)[5..];
-    const stats = parse_cpustat_fields(line);
+    const stats = parseCPUStatFields(line);
 
     // print("{s}\n{any}", .{ line, stats });
     return stats;
 }
 
-fn get_cpu_percent(sampleTime: ?u12) ?u7 {
-    const timeToWait: u64 = std.time.ns_per_ms * @as(u64, @intCast((sampleTime orelse 100)));
-    const sample1 = get_cpu_sample() orelse return null;
-    std.time.sleep(timeToWait);
-    const sample2 = get_cpu_sample() orelse return null;
+fn getCPUPercent(sampleTime: ?u12) ?u7 {
+    const time_to_wait: u64 = std.time.ns_per_ms * @as(u64, @intCast((sampleTime orelse 100)));
+    const sample1 = getCPUSample() orelse return null;
+    std.time.sleep(time_to_wait);
+    const sample2 = getCPUSample() orelse return null;
 
-    const sample1TotalTicks = tick: {
+    const sample1_total_ticks = tick: {
         var total: u64 = 0;
         total += sample1.user;
         total += sample1.nice;
@@ -151,7 +151,7 @@ fn get_cpu_percent(sampleTime: ?u12) ?u7 {
         break :tick total;
     };
 
-    const sample2TotalTicks = tick: {
+    const sample2_total_ticks = tick: {
         var total: u64 = 0;
         total += sample2.user;
         total += sample2.nice;
@@ -160,24 +160,24 @@ fn get_cpu_percent(sampleTime: ?u12) ?u7 {
         break :tick total;
     };
 
-    const totalTicks = @abs(sample2TotalTicks - sample1TotalTicks);
-    const idleTicks = @abs(sample2.idle - sample1.idle);
+    const total_ticks = @abs(sample2_total_ticks - sample1_total_ticks);
+    const idle_ticks = @abs(sample2.idle - sample1.idle);
 
-    const percent = @as(f128, @floatFromInt(totalTicks)) / (@as(f128, @floatFromInt(idleTicks)) + (@as(f128, @floatFromInt(totalTicks)))) * 100;
+    const percent = @as(f128, @floatFromInt(total_ticks)) / (@as(f128, @floatFromInt(idle_ticks)) + (@as(f128, @floatFromInt(total_ticks)))) * 100;
 
     return @intFromFloat(@trunc(percent));
 }
 
-fn get_load_avg() str {
+fn getLoadAverage() str {
     // https://fr.wikipedia.org/wiki/Load_average
     return "TODO";
 }
 
-fn getRAMStats() ?RAMInfo {
+fn getRAMStats() ?RAMStat {
     var buff: [50]u8 = undefined;
     var buf2: [50]u8 = undefined;
-    const mem_total_str = parse_proc_info("/proc/meminfo", "MemTotal", &buff, null);
-    const mem_available_str = parse_proc_info("/proc/meminfo", "MemAvailable", &buf2, null);
+    const mem_total_str = parseProcInfo("/proc/meminfo", "MemTotal", &buff, null);
+    const mem_available_str = parseProcInfo("/proc/meminfo", "MemAvailable", &buf2, null);
 
     if (mem_total_str == null or mem_available_str == null) return null;
 
@@ -192,17 +192,17 @@ fn getRAMStats() ?RAMInfo {
     };
 }
 
-fn get_uptime() i64 {
+fn getUptime() i64 {
     var ts: os.timespec = undefined;
     os.clock_gettime(os.linux.CLOCK.BOOTTIME, &ts) catch unreachable;
     return @as(i64, ts.tv_sec);
 }
 
-fn trim_zeros_right(value: *[64:0]u8) []u8 {
+fn trimZerosRight(value: *[64:0]u8) []u8 {
     return value[0..std.mem.indexOfScalar(u8, value, 0).?];
 }
 
-fn process_request(request: zap.SimpleRequest) void {
+fn processRequest(request: zap.SimpleRequest) void {
     if (!(request.method == null) and !std.mem.eql(u8, request.method.?, "GET") or (!(request.path == null) and !std.mem.eql(u8, request.path.?, "/api"))) {
         request.setStatus(.not_found);
         request.sendJson("{\"Error\":\"BAD REQUEST\"}") catch return;
@@ -219,35 +219,35 @@ fn process_request(request: zap.SimpleRequest) void {
     //     return;
     // }
 
-    var requestBody: []const u8 = undefined;
-    var cpuInfoBuff: [256]u8 = undefined;
+    var request_body: []const u8 = undefined;
+    var cpu_info_buff: [256]u8 = undefined;
     var uname = os.uname();
 
-    const systemInfo = Infos{
-        .software = softwareInfo{},
+    const system_info = Infos{
+        .software = SoftwareInfo{},
         .server = ServerInfo{
             .id = os.getenv("SERVER_NAME") orelse "Unnamed server",
-            .uptime = get_uptime(),
-            .hostname = trim_zeros_right(&uname.nodename),
+            .uptime = getUptime(),
+            .hostname = trimZerosRight(&uname.nodename),
             .cpu = CPUInfo{
-                .usage = get_cpu_percent(null) orelse 0,
-                .arch = trim_zeros_right(&uname.machine),
-                .model = parse_proc_info("/proc/cpuinfo", "model name", &cpuInfoBuff, null) orelse "Unable to query CPU Name",
+                .usage = getCPUPercent(null) orelse 0,
+                .arch = trimZerosRight(&uname.machine),
+                .model = parseProcInfo("/proc/cpuinfo", "model name", &cpu_info_buff, null) orelse "Unable to query CPU Name",
             },
             .ram = getRAMStats(),
             .os = OSInfo{
-                .type = trim_zeros_right(&uname.sysname),
-                .platform = trim_zeros_right(&uname.sysname), // basically the same as the OS type
-                .version = trim_zeros_right(&uname.version),
-                .release = trim_zeros_right(&uname.release),
+                .type = trimZerosRight(&uname.sysname),
+                .platform = trimZerosRight(&uname.sysname), // basically the same as the OS type
+                .version = trimZerosRight(&uname.version),
+                .release = trimZerosRight(&uname.release),
             },
         },
     };
 
-    requestBody = std.json.stringifyAlloc(alloc, systemInfo, .{}) catch "{\"Error\":\"Unable to generate JSON\"}";
+    request_body = std.json.stringifyAlloc(alloc, system_info, .{}) catch "{\"Error\":\"Unable to generate JSON\"}";
 
     // std.debug.print("{s}\n", .{requestBody});
-    request.sendJson(requestBody) catch return;
+    request.sendJson(request_body) catch return;
 }
 
 pub fn main() !void {
@@ -258,7 +258,7 @@ pub fn main() !void {
     };
     var server = zap.SimpleHttpListener.init(.{
         .port = port,
-        .on_request = process_request,
+        .on_request = processRequest,
         .log = false,
     });
 
