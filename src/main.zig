@@ -209,6 +209,16 @@ fn process_request(request: zap.SimpleRequest) void {
         return;
     }
 
+    // looks like getHeader is broken on this version of zap
+    // const auth_header = request.getHeader("Authorization");
+    // if (auth_header == null or !std.mem.eql(u8, auth_header.?, os.getenv("PASSWORD").?)) {
+    //     request.setStatus(.forbidden);
+    //     print("{?u}", .{auth_header});
+    //     print("{any}", .{request});
+    //     request.sendJson("{\"Error\":\"UNAUTHORIZED\"}") catch return;
+    //     return;
+    // }
+
     var requestBody: []const u8 = undefined;
     var cpuInfoBuff: [256]u8 = undefined;
     var uname = os.uname();
@@ -246,7 +256,6 @@ pub fn main() !void {
         if (env == null) break :p DEFAULT_PORT;
         break :p std.fmt.parseUnsigned(usize, env.?, 10) catch DEFAULT_PORT;
     };
-
     var server = zap.SimpleHttpListener.init(.{
         .port = port,
         .on_request = process_request,
