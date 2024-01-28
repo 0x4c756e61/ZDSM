@@ -49,23 +49,6 @@ const RAMStat = struct {
     max: u32,
 };
 
-// const Infos = struct {
-//     serverVersion: str,
-//     serverId: str,
-//     serverUptime: i64,
-//     serverHostname: str,
-//     cpuUsage: u7,
-//     cpuArch: str,
-//     cpuName: str,
-//     ramPercent: u7,
-//     ramFree: u32, // support up to 4TB of RAM
-//     ramMax: u32,
-//     osType: str,
-//     osPlatform: str,
-//     osVersion: str,
-//     osRelease: str,
-// };
-
 const ServerInfo = struct {
     id: str,
     uptime: i64,
