@@ -7,10 +7,14 @@ const print = std.debug.print;
 
 const str = []const u8;
 
-pub const CPUSample = struct {
+const CPUSample = struct {
+    /// Time spent in user mode
     user: u64,
+    /// Time spent processing niced processes
     nice: u64,
+    /// Time spent in system mode
     system: u64,
+    /// Time spend idling
     idle: u64,
     // iowait: u64,
     // irq: u64,
@@ -22,7 +26,9 @@ pub const CPUSample = struct {
 
 pub const CPUInfo = struct {
     usage: u7, // percentage, cannot exceed 100
+    /// CPU Archicture
     arch: str,
+    /// CPU Model and speed
     model: str,
 };
 
@@ -39,6 +45,15 @@ pub const RAMStat = struct {
     max: u32,
 };
 
+/// get time since boot in second
+pub fn getUptime() i64 {
+    var ts: os.timespec = undefined;
+    os.clock_gettime(os.linux.CLOCK.BOOTTIME, &ts) catch unreachable;
+    return @as(i64, ts.tv_sec);
+}
+
+/// Query /proc/meminfo or /proc/cpuinfo for specific values
+/// @param path: <comptime string>
 pub fn parseProcInfo(comptime path: str, key: str, buf: []u8, max_it: ?u8) ?str {
     var i: u8 = 0;
     var fbs = std.io.fixedBufferStream(buf);
@@ -64,7 +79,7 @@ pub fn parseProcInfo(comptime path: str, key: str, buf: []u8, max_it: ?u8) ?str 
     return null;
 }
 
-pub fn parseCPUStatFields(field_line: []u8) CPUSample {
+fn parseCPUStatFields(field_line: []u8) CPUSample {
     var it = std.mem.splitScalar(u8, field_line, ' ');
     var result: CPUSample = undefined;
     // TODO: Optimise using metaprogramming
@@ -82,7 +97,7 @@ pub fn parseCPUStatFields(field_line: []u8) CPUSample {
     return result;
 }
 
-pub fn getCPUSample() ?CPUSample {
+fn getCPUSample() ?CPUSample {
     // SEE: https://stackoverflow.com/questions/11356330/how-to-get-cpu-usage
     // SEE: https://www.baeldung.com/linux/get-cpu-usage
     var buf: [200]u8 = undefined;
@@ -98,6 +113,8 @@ pub fn getCPUSample() ?CPUSample {
     return stats;
 }
 
+/// Query system for CPU Usage
+/// Returns an integer in between 0 and 100
 pub fn getCPUPercent(sampleTime: ?u12) ?u7 {
     const time_to_wait: u64 = std.time.ns_per_ms * @as(u64, @intCast((sampleTime orelse 100)));
     const sample1 = getCPUSample() orelse return null;
@@ -130,6 +147,10 @@ pub fn getCPUPercent(sampleTime: ?u12) ?u7 {
     return @intFromFloat(@trunc(percent));
 }
 
+/// Query RAM Information such as
+/// - available memory
+/// - available total
+/// - RAM usage as percentage
 pub fn getRAMStats() ?RAMStat {
     var buff: [50]u8 = undefined;
     var buf2: [50]u8 = undefined;
