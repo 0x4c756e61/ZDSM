@@ -16,8 +16,8 @@
     // internet connectivity.
     .dependencies = .{
         .zap = .{
-            .url = "https://github.com/edyu/zap/archive/refs/tags/v0.1.5.12-pre.tar.gz",
-            .hash = "122094e44c63f44b4c646ab7dcedc75d6a0b8430b3a09fad540b5dad3c3d7aafaa44",
+            .url = "https://github.com/edyu/zap/archive/refs/tags/v0.5.0.tar.gz",
+            .hash = "12203e381b737b077759d3c63a1752fe79bb35dd50d1122a329a3f7b4504156d5595",
         },
     },
     .paths = .{

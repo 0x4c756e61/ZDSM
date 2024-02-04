@@ -43,7 +43,7 @@ fn trimZerosRight(value: *[64:0]u8) []u8 {
     return value[0..mem.indexOfScalar(u8, value, 0).?];
 }
 
-fn processRequest(request: zap.SimpleRequest) void {
+fn processRequest(request: zap.Request) void {
     if (!(request.method == null) and !mem.eql(u8, request.method.?, "GET") or (!(request.path == null) and !mem.eql(u8, request.path.?, "/api"))) {
         request.setStatus(.not_found);
         request.sendJson("{\"Error\":\"BAD REQUEST\"}") catch return;
@@ -95,7 +95,7 @@ pub fn main() !void {
         if (env == null) break :p DEFAULT_PORT;
         break :p fmt.parseUnsigned(usize, env.?, 10) catch DEFAULT_PORT;
     };
-    var server = zap.SimpleHttpListener.init(.{
+    var server = zap.HttpListener.init(.{
         .port = port,
         .on_request = processRequest,
         .log = false,

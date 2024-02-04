@@ -39,12 +39,13 @@ pub fn build(b: *std.Build) void {
     const zap = b.dependency("zap", .{
         .target = target,
         .optimize = optimize,
+        .openssl = false,
     });
-    exe.addModule("zap", zap.module("zap"));
+    exe.root_module.addImport("zap", zap.module("zap"));
     exe.linkLibrary(zap.artifact("facil.io"));
 
-    const os_stats_module = b.addModule("os-stats", .{ .source_file = .{ .path = "src/libs/os-stats.zig" } });
-    exe.addModule("os-stats", os_stats_module);
+    const os_stats_module = b.addModule("os-stats", .{ .root_source_file = .{ .path = "src/libs/os-stats.zig" } });
+    exe.root_module.addImport("os-stats", os_stats_module);
 
     // This declares intent for the executable to be installed into the
     // standard location when the user invokes the "install" step (the default
