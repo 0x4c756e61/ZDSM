@@ -50,15 +50,20 @@ fn processRequest(request: zap.Request) void {
         return;
     }
 
-    // looks like getHeader is broken on this version of zap
-    // const auth_header = request.getHeader("Authorization");
-    // if (auth_header == null or !mem.eql(u8, auth_header.?, os.getenv("PASSWORD").?)) {
-    //     request.setStatus(.forbidden);
-    //     print("{?u}", .{auth_header});
-    //     print("{any}", .{request});
-    //     request.sendJson("{\"Error\":\"UNAUTHORIZED\"}") catch return;
-    //     return;
-    // }
+    const authenticator = zap.Auth.BearerSingle;
+    var auth = authenticator.init(alloc, os.getenv("PASSWORD") orelse "admin", null) catch return;
+    defer auth.deinit();
+
+    const rq = request;
+    const ar = auth.authenticateRequest(&rq);
+
+    if (ar != zap.Auth.AuthResult.AuthOK) {
+        auth.deinit();
+        print("{any}", .{ar});
+        request.setStatus(.forbidden);
+        request.sendJson("{\"Error\":\"UNAUTHORIZED\"}") catch return;
+        return;
+    }
 
     var request_body: []const u8 = undefined;
     var cpu_info_buff: [256]u8 = undefined;
