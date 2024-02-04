@@ -58,7 +58,6 @@ fn processRequest(request: zap.Request) void {
     const ar = auth.authenticateRequest(&rq);
 
     if (ar != zap.Auth.AuthResult.AuthOK) {
-        auth.deinit();
         print("{any}", .{ar});
         request.setStatus(.forbidden);
         request.sendJson("{\"Error\":\"UNAUTHORIZED\"}") catch return;
