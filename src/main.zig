@@ -1,6 +1,7 @@
 const std = @import("std");
 const zap = @import("zap");
 const oss = @import("os-stats");
+const utils = @import("utils");
 
 const os = std.os;
 const print = std.debug.print;
@@ -13,10 +14,15 @@ const RAMStat = oss.RAMStat;
 const OSInfo = oss.OSInfo;
 
 const str = []const u8;
+const banner = @embedFile("assets/banner.txt");
+
 const DEFAULT_PORT = 3040;
+const DEFAULT_PASSWORD = "admin";
+const DEFAULT_SERVERNAME = "ZDSM";
 
 var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 var alloc = gpa.allocator();
+var ctx: *const Context = undefined;
 
 // TODO: Parse build.zig.zon at compile time to get version
 const SERVER_VERSION = "v0.0.0";
@@ -34,6 +40,11 @@ const ServerInfo = struct {
 
 const Infos = struct { software: SoftwareInfo, server: ServerInfo };
 
+const Context = struct {
+    server_name: str,
+    password: str,
+};
+
 fn getLoadAverage() str {
     // https://fr.wikipedia.org/wiki/Load_average
     return "TODO";
@@ -47,20 +58,21 @@ fn processRequest(request: zap.Request) void {
     if (!(request.method == null) and !mem.eql(u8, request.method.?, "GET") or (!(request.path == null) and !mem.eql(u8, request.path.?, "/api"))) {
         request.setStatus(.not_found);
         request.sendJson("{\"Error\":\"BAD REQUEST\"}") catch return;
+        utils.warn("Got malformed request: got {?s} /{?s}", .{ request.method, request.path }) catch return;
         return;
     }
 
     const authenticator = zap.Auth.BearerSingle;
-    var auth = authenticator.init(alloc, os.getenv("PASSWORD") orelse "admin", null) catch return;
+    var auth = authenticator.init(alloc, ctx.password, null) catch return;
     defer auth.deinit();
 
     const rq = request;
     const ar = auth.authenticateRequest(&rq);
 
     if (ar != zap.Auth.AuthResult.AuthOK) {
-        print("{any}", .{ar});
-        request.setStatus(.forbidden);
+        request.setStatus(.unauthorized);
         request.sendJson("{\"Error\":\"UNAUTHORIZED\"}") catch return;
+        utils.warn("Login attempt failed", .{}) catch return;
         return;
     }
 
@@ -71,7 +83,7 @@ fn processRequest(request: zap.Request) void {
     const system_info = Infos{
         .software = SoftwareInfo{},
         .server = ServerInfo{
-            .id = os.getenv("SERVER_NAME") orelse "Unnamed server",
+            .id = ctx.server_name,
             .uptime = oss.getUptime(),
             .hostname = trimZerosRight(&uname.nodename),
             .cpu = CPUInfo{
@@ -94,19 +106,26 @@ fn processRequest(request: zap.Request) void {
 }
 
 pub fn main() !void {
+    const password = os.getenv("PASSWORD") orelse DEFAULT_PASSWORD;
+    const server_name = os.getenv("SERVER_NAME") orelse "Unnamed server";
     const port = p: {
         const env = os.getenv("PORT");
         if (env == null) break :p DEFAULT_PORT;
         break :p fmt.parseUnsigned(usize, env.?, 10) catch DEFAULT_PORT;
     };
+
+    ctx = &Context{ .server_name = server_name, .password = password };
+
     var server = zap.HttpListener.init(.{
         .port = port,
         .on_request = processRequest,
         .log = false,
     });
 
+    print(banner, .{ SERVER_VERSION, port, password });
+
     try server.listen();
-    print("Started on port {any}\n", .{@as(u16, @truncate(port))});
+    try utils.info("Server running on port {any}", .{@as(u16, @truncate(port))});
 
     zap.start(.{
         .threads = 1,
