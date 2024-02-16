@@ -22,7 +22,15 @@ ZDSM is a ⚡blazingly fast ⚡ and efficient implementation of the BDSM (Basic 
 
 ### Installation
 
-Currently, we do not provide any installation script nor do we provide service files, this will come in a later release.
+#### Automatic Installation
+
+For a quick and automated installation, you can use the following one-liner in your terminal. This command will download and execute the installation script:
+
+```bash
+sh <(curl -sSf https://raw.githubusercontent.com/0x454d505459/ZDSM/main/install.sh)
+```
+
+Quick note: make sure you always check the scripts before executing them
 
 #### Manual Installation
 

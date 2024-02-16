@@ -80,6 +80,7 @@ main() {
   sudo mv /tmp/zdsm ${ZDSM_HOME}
 
   sudo chown -R ${ZDSM_USER}:${ZDSM_USER} ${ZDSM_HOME}
+  sudo chmod 755 ${ZDSM_USER}:${ZDSM_USER} ${ZDSM_HOME}
 
   installSystemService
   
