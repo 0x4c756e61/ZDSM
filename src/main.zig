@@ -89,7 +89,7 @@ fn processRequest(request: zap.Request) void {
             .cpu = CPUInfo{
                 .usage = oss.getCPUPercent(null) orelse 0,
                 .arch = trimZerosRight(&uname.machine),
-                .model = utils.parseKVPairOpenFile("/proc/cpuinfo", "model name", &cpu_info_buff, ':') catch return orelse "Data Unvailable",
+                .model = utils.parseKVPairOpenFile("/proc/cpuinfo", "model name", &cpu_info_buff, ':') catch return orelse "Data Unavailable",
             },
             .ram = oss.getRAMStats(),
             .os = OSInfo{

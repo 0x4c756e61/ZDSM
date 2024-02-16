@@ -16,7 +16,7 @@ fn baseLogger(comptime color: []const u8, comptime label: []const u8, comptime f
     const timestamp: u64 = @truncate(@abs(std.time.timestamp()));
     var stdout = std.io.getStdOut();
 
-    try std.fmt.format(stdout.writer(), "{s}[{any}:{any}:{any}]{s} {s}{s}{s}\t-- " ++ fmt ++ "\n", .{
+    try std.fmt.format(stdout.writer(), "{s}[{any}:{any}:{any}]{s} {s}{s}{s} \t-- " ++ fmt ++ "\n", .{
         GRAY,
         @as(u5, @truncate((timestamp / 3600) % 24)),
         @as(u6, @truncate((timestamp / 60) % 60)),
@@ -53,11 +53,12 @@ pub fn parseKVPair(reader: anytype, key: []const u8, buffer: []u8, delimiter: u8
     var key_writer = keybuffer_stream.writer();
 
     while (reader.readByte()) |byte| {
+        if (byte == '\t') continue;
         if (byte == delimiter) {
             if (mem.eql(u8, key, keybuffer_stream.getWritten())) {
                 // Note : We could write our own implementation of streamUntilDelimiter to account for whitespaces,
                 // trimming the spaces in one go
-                reader.streamUntilDelimiter(value_writer, '\n', null) catch |e| {
+                reader.streamUntilDelimiter(value_writer, '\n', buffer.len) catch |e| {
                     err("parseKVPair :  {s}", .{@errorName(e)}) catch {};
                     break;
                 };
@@ -69,19 +70,19 @@ pub fn parseKVPair(reader: anytype, key: []const u8, buffer: []u8, delimiter: u8
         }
 
         try key_writer.writeByte(byte);
-    } else |_| {
+    } else |e| {
+        err("Key not found: {s} ({s})", .{ key, @errorName(e) }) catch {};
+
         return null;
     }
-
-    return null;
+    unreachable;
 }
 
 pub fn parseKVPairOpenFile(path: []const u8, key: []const u8, buffer: []u8, delimiter: u8) !?[]const u8 {
-    var fileDescriptor = try fs.openFileAbsolute(path, .{ .intended_io_mode = .blocking });
-    const file = fileDescriptor.reader();
-    defer fileDescriptor.close();
+    var file_descriptor = try fs.openFileAbsolute(path, .{ .intended_io_mode = .blocking });
+    defer file_descriptor.close();
 
-    return parseKVPair(file, key, buffer, delimiter);
+    return parseKVPair(file_descriptor.reader(), key, buffer, delimiter);
 }
 
 pub fn getenv(name: []const u8, buffer: []u8) ?[]const u8 {
