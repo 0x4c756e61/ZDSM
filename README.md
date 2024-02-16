@@ -63,7 +63,7 @@ Replace `<your-password>` with your actual server password.
 
 ### Configuration
 
-You can customize your ZDSM server by editing the following environment variables. Please note that as of now, `.env` files are not supported, so you should set these variables directly in your environment.
+You can customize your ZDSM server by editing the following environment variables.
 
 - **PORT (Default: 3040):**
   - Set the port on which the ZDSM server will run.
@@ -73,6 +73,17 @@ You can customize your ZDSM server by editing the following environment variable
 
 - **PASSWORD (Default: "admin"):**
   - Set the password for server authentication.
+
+Additionally, ZDSM follows a specific configuration lookup order:
+
+1. **Look for `.env` File:**
+   - ZDSM first looks for a file named `.env` next to the executable. If found, it will use the configuration from this file.
+
+2. **Fallback to Environment Variables:**
+   - If no `.env` file is found, ZDSM will check for the specified environment variables. You can set these directly in your environment.
+
+3. **Default Configuration:**
+   - If neither an `.env` file nor environment variables are provided, ZDSM will fallback to the hardcoded configuration.
 
 ### Compiling
 
