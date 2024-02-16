@@ -25,7 +25,7 @@ var alloc = gpa.allocator();
 var ctx: *const Context = undefined;
 
 // TODO: Parse build.zig.zon at compile time to get version
-const SERVER_VERSION = "v0.0.0";
+const SERVER_VERSION = "v0.1.0";
 
 const SoftwareInfo = struct { version: str = SERVER_VERSION };
 
