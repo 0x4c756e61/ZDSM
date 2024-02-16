@@ -14,7 +14,7 @@ const RAMStat = oss.RAMStat;
 const OSInfo = oss.OSInfo;
 
 const str = []const u8;
-const banner = @embedFile("assets/banner.txt");
+const banner = @embedFile("banner");
 
 const DEFAULT_PORT = 3040;
 const DEFAULT_PASSWORD = "admin";
@@ -89,7 +89,7 @@ fn processRequest(request: zap.Request) void {
             .cpu = CPUInfo{
                 .usage = oss.getCPUPercent(null) orelse 0,
                 .arch = trimZerosRight(&uname.machine),
-                .model = oss.parseProcInfo("/proc/cpuinfo", "model name", &cpu_info_buff, null) orelse "Unable to query CPU Name",
+                .model = utils.parseKVPairOpenFile("/proc/cpuinfo", "model name", &cpu_info_buff, ':') catch return orelse "Data Unvailable",
             },
             .ram = oss.getRAMStats(),
             .os = OSInfo{
@@ -106,10 +106,14 @@ fn processRequest(request: zap.Request) void {
 }
 
 pub fn main() !void {
-    const password = os.getenv("PASSWORD") orelse DEFAULT_PASSWORD;
-    const server_name = os.getenv("SERVER_NAME") orelse "Unnamed server";
+    var password_buff: [50]u8 = undefined;
+    var server_name_buff: [50]u8 = undefined;
+    var port_buffer: [5]u8 = undefined;
+
+    const password = utils.getenv("PASSWORD", &password_buff) orelse DEFAULT_PASSWORD;
+    const server_name = utils.getenv("SERVER_NAME", &server_name_buff) orelse DEFAULT_SERVERNAME;
     const port = p: {
-        const env = os.getenv("PORT");
+        const env = utils.getenv("PORT", &port_buffer);
         if (env == null) break :p DEFAULT_PORT;
         break :p fmt.parseUnsigned(usize, env.?, 10) catch DEFAULT_PORT;
     };
@@ -122,7 +126,7 @@ pub fn main() !void {
         .log = false,
     });
 
-    print(banner, .{ SERVER_VERSION, port, password });
+    print(banner, .{ server_name, SERVER_VERSION, port, password });
 
     try server.listen();
     try utils.info("Server running on port {any}", .{@as(u16, @truncate(port))});

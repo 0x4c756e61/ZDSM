@@ -1,4 +1,5 @@
 const std = @import("std");
+const utils = @import("utils");
 
 const fs = std.fs;
 const os = std.os;
@@ -25,7 +26,7 @@ const CPUSample = struct {
 };
 
 pub const CPUInfo = struct {
-    usage: u7, // percentage, cannot exceed 100
+    usage: f16, // percentage, cannot exceed 100
     /// CPU Archicture
     arch: str,
     /// CPU Model and speed
@@ -50,33 +51,6 @@ pub fn getUptime() i64 {
     var ts: os.timespec = undefined;
     os.clock_gettime(os.linux.CLOCK.BOOTTIME, &ts) catch unreachable;
     return @as(i64, ts.tv_sec);
-}
-
-/// Query /proc/meminfo or /proc/cpuinfo for specific values
-/// @param path: <comptime string>
-pub fn parseProcInfo(comptime path: str, key: str, buf: []u8, max_it: ?u8) ?str {
-    var i: u8 = 0;
-    var fbs = std.io.fixedBufferStream(buf);
-    var fileDescriptor = fs.openFileAbsolute(path, .{ .intended_io_mode = .blocking }) catch |err| switch (err) {
-        error.FileNotFound => return "Error: No " ++ path,
-        else => return "Error openning " ++ path,
-    };
-
-    defer fileDescriptor.close();
-    const file = fileDescriptor.reader();
-
-    while (i < (max_it orelse 10)) : (i += 1) {
-        defer fbs.reset();
-        file.streamUntilDelimiter(fbs.writer(), '\n', null) catch return null;
-        const written = fbs.getWritten();
-        if (written.len < key.len) continue;
-        // std.debug.print("{s}\n", .{written});
-        if (std.mem.eql(u8, written[0..key.len], key)) {
-            const colon_pos = std.mem.indexOfScalar(u8, written, ':').?;
-            return std.mem.trimLeft(u8, written[colon_pos + 2 ..], " ");
-        }
-    }
-    return null;
 }
 
 fn parseCPUStatFields(field_line: []u8) CPUSample {
@@ -115,7 +89,7 @@ fn getCPUSample() ?CPUSample {
 
 /// Query system for CPU Usage
 /// Returns an integer in between 0 and 100
-pub fn getCPUPercent(sampleTime: ?u12) ?u7 {
+pub fn getCPUPercent(sampleTime: ?u12) ?f16 {
     const time_to_wait: u64 = std.time.ns_per_ms * @as(u64, @intCast((sampleTime orelse 100)));
     const sample1 = getCPUSample() orelse return null;
     std.time.sleep(time_to_wait);
@@ -144,7 +118,7 @@ pub fn getCPUPercent(sampleTime: ?u12) ?u7 {
 
     const percent = @as(f128, @floatFromInt(total_ticks)) / (@as(f128, @floatFromInt(idle_ticks)) + (@as(f128, @floatFromInt(total_ticks)))) * 100;
 
-    return @intFromFloat(@trunc(percent));
+    return @floatCast(percent);
 }
 
 /// Query RAM Information such as
@@ -154,8 +128,9 @@ pub fn getCPUPercent(sampleTime: ?u12) ?u7 {
 pub fn getRAMStats() ?RAMStat {
     var buff: [50]u8 = undefined;
     var buf2: [50]u8 = undefined;
-    const mem_total_str = parseProcInfo("/proc/meminfo", "MemTotal", &buff, null);
-    const mem_available_str = parseProcInfo("/proc/meminfo", "MemAvailable", &buf2, null);
+
+    const mem_total_str = utils.parseKVPairOpenFile("/proc/meminfo", "MemTotal", &buff, ':') catch null;
+    const mem_available_str = utils.parseKVPairOpenFile("/proc/meminfo", "MemAvailable", &buf2, ':') catch null;
 
     if (mem_total_str == null or mem_available_str == null) return null;
 

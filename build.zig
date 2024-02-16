@@ -15,20 +15,6 @@ pub fn build(b: *std.Build) void {
     // set a preferred release mode, allowing the user to decide how to optimize.
     const optimize = b.standardOptimizeOption(.{});
 
-    const lib = b.addStaticLibrary(.{
-        .name = "ZDSM",
-        // In this case the main source file is merely a path, however, in more
-        // complicated build scripts, this could be a generated file.
-        .root_source_file = .{ .path = "src/root.zig" },
-        .target = target,
-        .optimize = optimize,
-    });
-
-    // This declares intent for the library to be installed into the standard
-    // location when the user invokes the "install" step (the default step when
-    // running `zig build`).
-    b.installArtifact(lib);
-
     const exe = b.addExecutable(.{
         .name = "ZDSM",
         .root_source_file = .{ .path = "src/main.zig" },
@@ -41,14 +27,17 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
         .openssl = false,
     });
+
+    const os_stats_module = b.addModule("os-stats", .{ .root_source_file = .{ .path = "src/libs/os-stats.zig" } });
+    const utils = b.addModule("utils", .{ .root_source_file = .{ .path = "src/libs/utils.zig" } });
+
+    exe.root_module.addAnonymousImport("banner", .{ .root_source_file = .{ .path = "./assets/banner.txt" } });
+    exe.root_module.addImport("os-stats", os_stats_module);
+    exe.root_module.addImport("utils", utils);
     exe.root_module.addImport("zap", zap.module("zap"));
     exe.linkLibrary(zap.artifact("facil.io"));
 
-    const os_stats_module = b.addModule("os-stats", .{ .root_source_file = .{ .path = "src/libs/os-stats.zig" } });
-    exe.root_module.addImport("os-stats", os_stats_module);
-
-    const utils = b.addModule("utils", .{ .root_source_file = .{ .path = "src/libs/utils.zig" } });
-    exe.root_module.addImport("utils", utils);
+    os_stats_module.addImport("utils", utils);
 
     // This declares intent for the executable to be installed into the
     // standard location when the user invokes the "install" step (the default

@@ -52,7 +52,7 @@ Currently, we do not provide any installation script nor do we provide service f
 
 ### Usage
 
-To retrieve information from your server, you'll need a client that supports the new BDSM protocol. As of now, the official client is undergoing a complete rewrite and is not yet available.
+To retrieve information from your server, you'll need a client that supports the new BDSM protocol. As of now, the official client is undergoing a complete rewrite and is not yet available.However, if necessary, an adapted version of the old client has been modified to use the new protocol. You can find this version available in [this fork](https://github.com/0x454d505459/bdsm-client-v1.5/).
 
 In the meantime, you can still query the server using tools like `curl` or `xh` in your terminal. Here's an example using `curl`:
 
